@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AraLithic OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,300&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:     #030a0f;
+      --bg1:    #060d14;
+      --cyan:   #00d4ff;
+      --cyan2:  #00ffea;
+      --green:  #00ff88;
+      --amber:  #ffb300;
+      --red:    #ff4466;
+      --purple: #bb88ff;
+      --pink:   #ff6eb4;
+      --white:  #d0e8f0;
+      --dim:    #3a5a6a;
+      --muted:  #1e3040;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg);
+      color: var(--white);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      cursor: none;
+    }
+
+    /* ── CUSTOM CURSOR ── */
+    #cur {
+      position: fixed;
+      width: 2px; height: 18px;
+      background: var(--cyan);
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: curBlink .7s infinite;
+    }
+
+    /* ── SCANLINES ── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px,
+        rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px
+      );
+      pointer-events: none;
+      z-index: 9000;
+    }
+
+    /* ── GRID ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,180,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,180,255,0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── TOPBAR ── */
+    #topbar {
+      flex-shrink: 0;
+      height: 28px;
+      background: rgba(0,20,35,0.95);
+      border-bottom: 1px solid rgba(0,200,255,0.15);
+      display: flex;
+      align-items: center;
+      padding: 0 1.2rem;
+      gap: 1rem;
+      font-size: .58rem;
+      letter-spacing: .14em;
+      color: var(--dim);
+      z-index: 100;
+      user-select: none;
+    }
+    .tb-brand { color: var(--cyan); font-weight: 700; letter-spacing: .22em; }
+    .tb-sep { width: 1px; height: 12px; background: rgba(0,200,255,0.15); }
+    #tb-clock { font-variant-numeric: tabular-nums; color: var(--dim); }
+    .tb-right { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+    .tb-status { display: flex; align-items: center; gap: .4rem; }
+    .sdot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+
+    /* ── SCREENS ── */
+    #screen {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    .screen-view {
+      position: absolute; inset: 0;
+      display: none;
+      flex-direction: column;
+    }
+    .screen-view.active { display: flex; }
+
+    /* ── LOGIN SCREEN ── */
+    #login-screen {
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+    .login-ascii {
+      font-size: .52rem;
+      line-height: 1.25;
+      color: var(--cyan);
+      text-shadow: 0 0 10px rgba(0,200,255,0.55), 0 0 2px rgba(0,200,255,0.9);
+      text-align: center;
+      white-space: pre;
+      letter-spacing: .01em;
+    }
+    .login-sub {
+      font-size: .62rem;
+      color: var(--dim);
+      letter-spacing: .2em;
+      text-align: center;
+    }
+    .login-prompt-line {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .78rem;
+    }
+    .lp-label { color: var(--green); }
+    #login-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--white);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem;
+      width: 160px;
+      caret-color: var(--cyan);
+    }
+    .login-hint { font-size: .58rem; color: var(--muted); letter-spacing: .12em; }
+    .login-error { font-size: .62rem; color: var(--red); display: none; }
+
+    /* ── BOOT SCREEN ── */
+    #boot-screen {
+      padding: 1.5rem 2rem;
+      overflow: hidden;
+    }
+    #boot-output {
+      font-size: .7rem;
+      line-height: 1.9;
+      color: var(--white);
+      white-space: pre-wrap;
+      overflow: hidden;
+    }
+
+    /* ── TERMINAL SCREEN ── */
+    #terminal-screen {
+      flex-direction: column;
+    }
+    #terminal-output {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.5rem;
+      font-size: .7rem;
+      line-height: 1.85;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #terminal-output::-webkit-scrollbar { width: 4px; }
+    #terminal-output::-webkit-scrollbar-thumb { background: rgba(0,200,255,0.15); border-radius: 2px; }
+
+    /* ── INPUT BAR ── */
+    #input-bar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      padding: .6rem 1.5rem;
+      border-top: 1px solid rgba(0,200,255,0.1);
+      background: rgba(0,10,18,0.8);
+    }
+    .prompt-ps1 { color: var(--green); font-size: .7rem; white-space: nowrap; flex-shrink: 0; }
+    .prompt-ps1 .host { color: var(--cyan); }
+    .prompt-ps1 .path { color: var(--purple); }
+    #cmd-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--white);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .7rem;
+      caret-color: var(--cyan);
+    }
+
+    /* ── COLORS ── */
+    .c-cyan   { color: var(--cyan); }
+    .c-cyan2  { color: var(--cyan2); }
+    .c-green  { color: var(--green); }
+    .c-amber  { color: var(--amber); }
+    .c-red    { color: var(--red); }
+    .c-purple { color: var(--purple); }
+    .c-pink   { color: var(--pink); }
+    .c-dim    { color: var(--dim); }
+    .c-white  { color: var(--white); }
+    .c-muted  { color: #2a4455; }
+    .bold     { font-weight: 700; }
+
+    /* GLOW effects */
+    .glow-cyan  { text-shadow: 0 0 10px rgba(0,212,255,0.7), 0 0 25px rgba(0,212,255,0.3); }
+    .glow-green { text-shadow: 0 0 10px rgba(0,255,136,0.6); }
+    .glow-amber { text-shadow: 0 0 10px rgba(255,179,0,0.6); }
+
+    /* ── OUTPUT LINE TYPES ── */
+    .out-line { display: block; }
+    .out-line.cmd-echo { color: var(--dim); }
+    .out-line.sep { color: var(--muted); }
+
+    /* Section headers */
+    .sec-bar {
+      display: block;
+      border-top: 1px solid rgba(0,200,255,0.12);
+      margin: .5rem 0 .3rem;
+    }
+
+    /* Tables */
+    .tbl { display: grid; }
+    .tbl-row { display: flex; gap: 1rem; padding: .1rem 0; }
+    .tbl-key { color: var(--cyan); min-width: 140px; flex-shrink: 0; }
+    .tbl-val { color: var(--white); }
+
+    /* Progress bars */
+    .pbar-row { display: flex; align-items: center; gap: .8rem; margin: .15rem 0; font-size: .66rem; }
+    .pbar-label { color: var(--white); min-width: 130px; }
+    .pbar-track { flex: 1; max-width: 180px; height: 6px; background: #0d2030; border-radius: 2px; overflow: hidden; border: 1px solid rgba(0,200,255,0.1); }
+    .pbar-fill { height: 100%; border-radius: 2px; }
+    .pbar-fill.high  { background: linear-gradient(90deg, var(--cyan), var(--cyan2)); box-shadow: 0 0 6px var(--cyan); }
+    .pbar-fill.med   { background: linear-gradient(90deg, var(--green), var(--cyan2)); box-shadow: 0 0 4px var(--green); }
+    .pbar-fill.low   { background: var(--amber); box-shadow: 0 0 4px var(--amber); }
+    .pbar-pct { color: var(--dim); min-width: 36px; }
+
+    /* Tag pills */
+    .tag-wrap { display: flex; flex-wrap: wrap; gap: .4rem; margin: .3rem 0; }
+    .tag {
+      font-size: .58rem;
+      padding: .2rem .6rem;
+      border-radius: 2px;
+      border: 1px solid;
+      letter-spacing: .06em;
+    }
+    .tag.cyan   { border-color: rgba(0,212,255,0.35); color: var(--cyan); background: rgba(0,212,255,0.06); }
+    .tag.green  { border-color: rgba(0,255,136,0.3); color: var(--green); background: rgba(0,255,136,0.05); }
+    .tag.amber  { border-color: rgba(255,179,0,0.3); color: var(--amber); background: rgba(255,179,0,0.05); }
+    .tag.purple { border-color: rgba(187,136,255,0.3); color: var(--purple); background: rgba(187,136,255,0.05); }
+
+    /* Paper card */
+    .paper-box {
+      border: 1px solid rgba(255,179,0,0.25);
+      border-left: 3px solid var(--amber);
+      padding: .7rem 1rem;
+      margin: .4rem 0;
+      background: rgba(255,179,0,0.03);
+      border-radius: 0 3px 3px 0;
+    }
+    .paper-box .pt { color: var(--amber); font-size: .72rem; font-weight: 700; line-height: 1.5; }
+    .paper-box .pm { color: var(--dim); font-size: .6rem; margin-top: .3rem; }
+
+    /* Project row */
+    .proj-box {
+      border-bottom: 1px solid rgba(0,200,255,0.07);
+      padding: .5rem 0;
+      display: flex;
+      gap: 1.5rem;
+    }
+    .proj-box .pn { color: var(--cyan); min-width: 32px; opacity: .5; }
+    .proj-box .ptitle { color: var(--white); font-weight: 500; min-width: 240px; }
+    .proj-box .pdesc { color: var(--dim); font-size: .65rem; flex: 1; }
+    .proj-box .pbadge { font-size: .55rem; padding: .1rem .5rem; border-radius: 2px; white-space: nowrap; flex-shrink: 0; }
+
+    /* Location row */
+    .loc-row { display: flex; align-items: center; gap: .8rem; padding: .25rem 0; }
+    .loc-dot { color: var(--cyan); }
+    .loc-n { color: var(--white); min-width: 100px; }
+    .loc-note { color: var(--dim); font-size: .62rem; }
+
+    /* ── ASCII ART WRAPPER ── */
+    .ascii-art {
+      font-size: .6rem;
+      line-height: 1.25;
+      white-space: pre;
+      display: inline-block;
+    }
+
+    /* ── NEOFETCH LAYOUT ── */
+    .neofetch-wrap {
+      display: flex;
+      gap: 2.5rem;
+      align-items: flex-start;
+      padding: .3rem 0;
+    }
+    .neofetch-info { min-width: 300px; }
+    .nf-row { display: flex; gap: .6rem; font-size: .68rem; padding: .08rem 0; }
+    .nf-key { color: var(--cyan); min-width: 100px; }
+    .nf-val { color: var(--white); }
+    .nf-sep { color: var(--cyan); margin: .15rem 0; }
+
+    /* ── HELP TABLE ── */
+    .help-row { display: flex; gap: 1.5rem; padding: .12rem 0; font-size: .68rem; }
+    .help-cmd { color: var(--cyan); min-width: 140px; font-weight: 500; }
+    .help-desc { color: var(--dim); }
+
+    /* ── ANIMATIONS ── */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: .4; }
+    }
+    @keyframes curBlink {
+      0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; }
+    }
+    @keyframes glitch {
+      0% { transform: translate(0); }
+      20% { transform: translate(-2px, 1px); }
+      40% { transform: translate(2px, -1px); }
+      60% { transform: translate(-1px, 2px); }
+      80% { transform: translate(1px, -2px); }
+      100% { transform: translate(0); }
+    }
+    .glitch-once { animation: glitch .15s 2; }
+
+    @media (max-width: 700px) {
+      .neofetch-wrap { flex-direction: column; gap: 1rem; }
+      .ascii-art { font-size: .48rem; }
+      .proj-box { flex-direction: column; gap: .2rem; }
+      .proj-box .pdesc { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div id="cur"></div>
+
+<!-- Topbar -->
+<div id="topbar">
+  <span class="tb-brand">ARALITHIC<span style="color:var(--dim)">-OS</span></span>
+  <div class="tb-sep"></div>
+  <span style="color:var(--dim)">v2.1.0-lts</span>
+  <div class="tb-sep"></div>
+  <span id="tb-date" style="color:var(--dim)"></span>
+  <div class="tb-right">
+    <div class="tb-status">
+      <div class="sdot"></div>
+      <span style="letter-spacing:.12em">OPEN TO OPPORTUNITIES</span>
+    </div>
+    <div class="tb-sep"></div>
+    <span id="tb-clock"></span>
+  </div>
+</div>
+
+<!-- Main screen area -->
+<div id="screen">
+
+  <!-- ══ LOGIN SCREEN ══ -->
+  <div class="screen-view active" id="login-screen">
+    <div class="login-ascii" id="login-ascii"></div>
+    <div class="login-sub">ARALITHIC-OS  ·  KERNEL 2.1.0  ·  x86_64</div>
+    <div class="login-prompt-line">
+      <span class="lp-label">aralithic login:</span>
+      <input id="login-input" type="text" autocomplete="off" spellcheck="false" autofocus placeholder="">
+    </div>
+    <div class="login-hint">type <span style="color:var(--cyan)">boot</span> and press enter to initialize</div>
+    <div class="login-error" id="login-error">unauthorized — try again</div>
+  </div>
+
+  <!-- ══ BOOT SCREEN ══ -->
+  <div class="screen-view" id="boot-screen">
+    <div id="boot-output"></div>
+  </div>
+
+  <!-- ══ TERMINAL SCREEN ══ -->
+  <div class="screen-view" id="terminal-screen">
+    <div id="terminal-output"></div>
+    <div id="input-bar">
+      <span class="prompt-ps1">
+        <span class="c-green">umair</span><span class="c-dim">@</span><span class="host c-cyan">aralithic</span><span class="c-dim">:</span><span class="path c-purple">~</span><span class="c-dim">$</span>
+      </span>
+      <input id="cmd-input" type="text" autocomplete="off" spellcheck="false" autofocus>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function h(tag, cls, html) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (html !== undefined) el.innerHTML = html;
+  return el;
+}
+
+// Cursor tracking
+const cur = document.getElementById('cur');
+document.addEventListener('mousemove', e => {
+  cur.style.left = e.clientX + 'px';
+  cur.style.top  = e.clientY + 'px';
+});
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('tb-clock').textContent =
+    now.toLocaleTimeString('en-GB', { hour12: false });
+  document.getElementById('tb-date').textContent =
+    now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+}
+updateClock(); setInterval(updateClock, 1000);
+
+// ═══════════════════════════════════════════════════════
+// ASCII ART
+// ═══════════════════════════════════════════════════════
+
+const LOGIN_ASCII = `
+ █████╗ ██████╗  █████╗ ██╗     ██╗████████╗██╗  ██╗██╗ ██████╗ 
+██╔══██╗██╔══██╗██╔══██╗██║     ██║╚══██╔══╝██║  ██║██║██╔════╝ 
+███████║██████╔╝███████║██║     ██║   ██║   ███████║██║██║      
+██╔══██║██╔══██╗██╔══██║██║     ██║   ██║   ██╔══██║██║██║      
+██║  ██║██║  ██║██║  ██║███████╗██║   ██║   ██║  ██║██║╚██████╗ 
+╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝ ╚═════╝`;
+
+const NEOFETCH_ASCII = `
+ █████╗ ██████╗  █████╗ ██╗     ██╗████████╗██╗  ██╗██╗ ██████╗ 
+██╔══██╗██╔══██╗██╔══██╗██║     ██║╚══██╔══╝██║  ██║██║██╔════╝ 
+███████║██████╔╝███████║██║     ██║   ██║   ███████║██║██║      
+██╔══██║██╔══██╗██╔══██║██║     ██║   ██║   ██╔══██║██║██║      
+██║  ██║██║  ██║██║  ██║███████╗██║   ██║   ██║  ██║██║╚██████╗ 
+╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝ ╚═════╝`;
+
+document.getElementById('login-ascii').textContent = LOGIN_ASCII;
+
+// ═══════════════════════════════════════════════════════
+// SCREEN MANAGER
+// ═══════════════════════════════════════════════════════
+
+function showScreen(id) {
+  document.querySelectorAll('.screen-view').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════
+// LOGIN
+// ═══════════════════════════════════════════════════════
+
+const loginInput = document.getElementById('login-input');
+const loginError = document.getElementById('login-error');
+
+loginInput.addEventListener('keydown', async e => {
+  if (e.key !== 'Enter') return;
+  const val = loginInput.value.trim().toLowerCase();
+  loginInput.value = '';
+  if (val === 'boot') {
+    showScreen('boot-screen');
+    await runBoot();
+  } else {
+    loginError.style.display = 'block';
+    loginError.classList.add('glitch-once');
+    setTimeout(() => { loginError.style.display = 'none'; loginError.classList.remove('glitch-once'); }, 2000);
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// BOOT SEQUENCE
+// ═══════════════════════════════════════════════════════
+
+const bootOut = document.getElementById('boot-output');
+
+function bootLine(html, delay = 0) {
+  return new Promise(r => {
+    setTimeout(() => {
+      const line = document.createElement('div');
+      line.innerHTML = html;
+      bootOut.appendChild(line);
+      r();
+    }, delay);
+  });
+}
+
+async function typeBootText(text, color = '#3a5a6a', speed = 22) {
+  const span = document.createElement('span');
+  span.style.color = color;
+  bootOut.appendChild(span);
+  for (const ch of text) {
+    span.textContent += ch;
+    await sleep(speed);
+  }
+  bootOut.appendChild(document.createElement('br'));
+}
+
+const BOOT_LINES = [
+  { html: `<span style="color:#1e3040">────────────────────────────────────────────────────────────────────────────────</span>` },
+  { html: `<span style="color:var(--cyan);font-weight:700;text-shadow:0 0 12px rgba(0,200,255,.6)">  ARALITHIC-OS  v2.1.0-lts  [x86_64]</span>` },
+  { html: `<span style="color:#1e3040">────────────────────────────────────────────────────────────────────────────────</span>` },
+  { html: `` },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Started GRUB bootloader</span>`, d: 25 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Loading kernel modules...</span>`, d: 30 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Mounting filesystems</span>`, d: 25 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Initializing memory allocator</span>`, d: 28 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Starting OpenMPI daemon</span>`, d: 35 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Loading ROS2 environment</span>`, d: 30 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> HPC runtime initialized — 8 cores detected</span>`, d: 28 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Python 3.12 env activated</span>`, d: 25 },
+  { html: `<span style="color:var(--amber)">  [WARN ] </span> <span style="color:#3a5a6a"> Pixxelraft module not found — skipping</span>`, d: 30 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Loading portfolio.service</span>`, d: 28 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Establishing research context</span>`, d: 30 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Starting chronos daemon</span>`, d: 25 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Network online</span>`, d: 28 },
+  { html: `` },
+  { html: `<span style="color:#2a4455">  ──── subsystem check ────────────────────────────────────────</span>`, d: 20 },
+  { html: `<span style="color:#3a5a6a">       astrophysics    </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
+  { html: `<span style="color:#3a5a6a">       mol-biology     </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
+  { html: `<span style="color:#3a5a6a">       hpc-compute     </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
+  { html: `<span style="color:#3a5a6a">       quant-engine    </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
+  { html: `<span style="color:#3a5a6a">       exoplanet-ml    </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
+  { html: `` },
+];
+
+async function runBoot() {
+  bootOut.innerHTML = '';
+  let cumDelay = 0;
+  for (const ln of BOOT_LINES) {
+    cumDelay += (ln.d || 40);
+    await bootLine(ln.html, cumDelay);
+  }
+
+  // Animated ASCII logo
+  await sleep(80);
+  const logoEl = document.createElement('pre');
+  logoEl.style.cssText = `color:var(--cyan);font-size:.52rem;line-height:1.25;text-shadow:0 0 10px rgba(0,200,255,.5),0 0 2px rgba(0,200,255,.9);margin:.5rem 0;letter-spacing:.01em;`;
+  bootOut.appendChild(logoEl);
+
+  const logoLines = NEOFETCH_ASCII.split('\n');
+  for (const ll of logoLines) {
+    await sleep(10);
+    logoEl.textContent += ll + '\n';
+  }
+
+  await sleep(80);
+  const doneEl = document.createElement('div');
+  doneEl.innerHTML = `<span style="color:var(--green);font-weight:700">  ✓ Boot complete.</span> <span style="color:#3a5a6a">Type </span><span style="color:var(--cyan)">help</span><span style="color:#3a5a6a"> to list commands. Launching shell...</span>`;
+  bootOut.appendChild(doneEl);
+
+  await sleep(300);
+  showScreen('terminal-screen');
+  await launchShell();
+}
+
+// ═══════════════════════════════════════════════════════
+// TERMINAL ENGINE
+// ═══════════════════════════════════════════════════════
+
+const termOut = document.getElementById('terminal-output');
+const cmdInput = document.getElementById('cmd-input');
+let cmdHistory = [];
+let histIdx = -1;
+
+let autoScroll = false; // only scroll on user-typed commands
+
+function write(html) {
+  const el = document.createElement('div');
+  el.innerHTML = html;
+  termOut.appendChild(el);
+  if (autoScroll) termOut.scrollTop = termOut.scrollHeight;
+}
+function writeln(html = '') { write(html); }
+function writeEl(el) {
+  termOut.appendChild(el);
+  if (autoScroll) termOut.scrollTop = termOut.scrollHeight;
+}
+function blank() { writeln(''); }
+function scrollToBottom() { termOut.scrollTop = termOut.scrollHeight; }
+
+async function writeLines(lines, delayMs = 18) {
+  for (const ln of lines) {
+    await sleep(delayMs);
+    writeln(ln);
+    termOut.scrollTop = termOut.scrollHeight;
+  }
+}
+
+function echoCmd(cmd) {
+  writeln(`<span class="c-green">umair</span><span class="c-dim">@</span><span class="c-cyan">aralithic</span><span class="c-dim">:</span><span class="c-purple">~</span><span class="c-dim">$</span> <span class="c-white">${cmd}</span>`);
+}
+
+// ═══════════════════════════════════════════════════════
+// CONTENT BLOCKS
+// ═══════════════════════════════════════════════════════
+
+function renderNeofetch() {
+  const wrap = document.createElement('div');
+  wrap.className = 'neofetch-wrap';
+
+  const art = document.createElement('pre');
+  art.className = 'ascii-art';
+  art.style.cssText = 'color:var(--cyan);font-size:.52rem;line-height:1.25;text-shadow:0 0 10px rgba(0,200,255,.5),0 0 2px rgba(0,200,255,.9);letter-spacing:.01em;';
+  art.textContent = NEOFETCH_ASCII;
+
+  const info = document.createElement('div');
+  info.className = 'neofetch-info';
+  info.innerHTML = `
+<div class="nf-row"><span class="nf-key c-cyan bold">umair</span><span class="c-dim">@</span><span class="c-cyan bold">aralithic</span></div>
+<div class="nf-sep c-dim">─────────────────────────────────</div>
+<div class="nf-row"><span class="nf-key c-cyan">OS</span><span class="nf-val">AraLithic-OS 2.1.0-lts</span></div>
+<div class="nf-row"><span class="nf-key c-cyan">Host</span><span class="nf-val">Sayed Umair Ali</span></div>
+<div class="nf-row"><span class="nf-key c-cyan">Degree</span><span class="nf-val">B.Tech CSE — Year 2</span></div>
+<div class="nf-row"><span class="nf-key c-cyan">Target</span><span class="nf-val c-green">M.Tech → HPC Career</span></div>
+<div class="nf-row"><span class="nf-key c-cyan">Location</span><span class="nf-val">Bhubaneswar, India</span></div>
+<div class="nf-row"><span class="nf-key c-cyan">Focus</span><span class="nf-val c-amber">HPC · Sci-Compute · Quant</span></div>
+<div class="nf-row"><span class="nf-key c-cyan">Paper</span><span class="nf-val c-amber">1 Published ↗ Kepler ML</span></div>
+<div class="nf-row"><span class="nf-key c-cyan">Shell</span><span class="nf-val">bash 5.2</span></div>
+<div class="nf-row"><span class="nf-key c-cyan">Uptime</span><span class="nf-val" id="nf-uptime">0s</span></div>
+<div class="nf-row"><span class="nf-key c-cyan">Status</span><span class="nf-val c-green">● Open to Opportunities</span></div>
+<div class="nf-sep c-dim">─────────────────────────────────</div>
+<div class="nf-row">
+  <span style="background:var(--red);width:14px;height:14px;display:inline-block;border-radius:2px;margin-right:4px"></span>
+  <span style="background:var(--amber);width:14px;height:14px;display:inline-block;border-radius:2px;margin-right:4px"></span>
+  <span style="background:var(--green);width:14px;height:14px;display:inline-block;border-radius:2px;margin-right:4px"></span>
+  <span style="background:var(--cyan);width:14px;height:14px;display:inline-block;border-radius:2px;margin-right:4px"></span>
+  <span style="background:var(--purple);width:14px;height:14px;display:inline-block;border-radius:2px;margin-right:4px"></span>
+  <span style="background:var(--pink);width:14px;height:14px;display:inline-block;border-radius:2px;margin-right:4px"></span>
+</div>`;
+
+  wrap.appendChild(art);
+  wrap.appendChild(info);
+  writeEl(wrap);
+
+  // live uptime
+  const start = Date.now();
+  setInterval(() => {
+    const el = document.getElementById('nf-uptime');
+    if (!el) return;
+    const s = Math.floor((Date.now() - start) / 1000);
+    el.textContent = s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`;
+  }, 1000);
+}
+
+function renderHelp() {
+  const cmds = [
+    ['neofetch',  'system info + ASCII art'],
+    ['about',     'who is AraLithic'],
+    ['research',  'published paper'],
+    ['projects',  'project list'],
+    ['skills',    'full skill stack'],
+    ['contact',   'email & github'],
+    ['targets',   'opportunity locations'],
+    ['interests', 'research passions'],
+    ['clear',     'clear terminal'],
+    ['exit',      'return to login screen'],
+    ['help',      'show this help'],
+  ];
+  writeln(`<span class="c-cyan bold">ARALITHIC-OS  ·  available commands</span>`);
+  writeln(`<span class="c-dim">──────────────────────────────────────────────────────</span>`);
+  cmds.forEach(([cmd, desc]) => {
+    writeln(`<div class="help-row"><span class="help-cmd">${cmd}</span><span class="help-desc">${desc}</span></div>`);
+  });
+}
+
+function renderAbout() {
+  writeln(`<span class="c-cyan bold glow-cyan">┌─ about.md ───────────────────────────────────────────┐</span>`);
+  blank();
+  writeln(`  <span class="c-white">I'm a <span class="c-cyan bold">2nd year B.Tech CSE student</span> deeply focused on</span>`);
+  writeln(`  <span class="c-white">High Performance Computing — both scientific and quantitative.</span>`);
+  blank();
+  writeln(`  <span class="c-white">My work lives at the intersection of raw compute and meaningful</span>`);
+  writeln(`  <span class="c-white">science. I've published research classifying exoplanets using</span>`);
+  writeln(`  <span class="c-white">ML on NASA Kepler data.</span>`);
+  blank();
+  writeln(`  <span class="c-white">Long-term: <span class="c-green">M.Tech → HPC research career</span> in</span>`);
+  writeln(`  <span class="c-white">HPC, Photoelectronics or Quant — wherever the work is rigorous,</span>`);
+  writeln(`  <span class="c-white">impactful, and well-compensated.</span>`);
+  blank();
+  writeln(`  <span class="c-amber">Target regions: </span><span class="c-white">USA · Switzerland · Netherlands</span>`);
+  blank();
+  writeln(`<span class="c-cyan bold">└──────────────────────────────────────────────────────┘</span>`);
+}
+
+function renderResearch() {
+  writeln(`<span class="c-amber bold glow-amber">┌─ research / publications ────────────────────────────┐</span>`);
+  blank();
+  const box = document.createElement('div');
+  box.className = 'paper-box';
+  box.innerHTML = `
+    <div class="pt">Comparative Study Using Machine Learning Techniques to Classify<br>
+    Exoplanets Based on Kepler Photometric and Stellar Data</div>
+    <div class="pm" style="margin-top:.5rem">
+      <span style="color:var(--amber)">Author:</span> <span style="color:var(--white)">Sayed Umair Ali</span>
+      &nbsp;·&nbsp;
+      <span style="color:var(--amber)">Domain:</span> <span style="color:var(--white)">Astrophysics · ML · Exoplanetary Science</span>
+    </div>
+    <div class="pm">
+      <span style="color:var(--amber)">Dataset:</span> <span style="color:var(--white)">NASA Kepler Mission</span>
+      &nbsp;·&nbsp;
+      <span style="color:var(--amber)">Status:</span> <span style="color:var(--green)">Published ✓</span>
+    </div>`;
+  writeEl(box);
+  blank();
+  writeln(`<span class="c-amber bold">└──────────────────────────────────────────────────────┘</span>`);
+}
+
+function renderProjects() {
+  writeln(`<span class="c-purple bold">┌─ projects ───────────────────────────────────────────┐</span>`);
+  blank();
+  const projects = [
+    { n:'001', t:'High Volume Fintech Trading Dashboard', d:'Lightweight analytics for HFT data visualization', badge:'Quant', bc:'#ffb300' },
+    { n:'002', t:'3D Protein Structure Viewer',           d:'Web-based molecular visualization tool',          badge:'Mol-Bio', bc:'#00ff88' },
+    { n:'003', t:'Mars Climate Analysis',                 d:'Martian atmosphere study — NASA InSight CSV',     badge:'Astro', bc:'#00d4ff' },
+    { n:'004', t:'Chilika Algae Growth Study',            d:'Climate effect on algae, Python sci-pipeline',   badge:'Env-Sci', bc:'#00ff88' },
+    { n:'005', t:'Automation & Dev Tooling',              d:'Bash/Python scripts for system & dev workflows',  badge:'Systems', bc:'#bb88ff' },
+    { n:'006', t:'Weather Forecast App',                  d:'Minimal app with real-time API integration',      badge:'Web', bc:'#3a5a6a' },
+  ];
+  projects.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'proj-box';
+    row.innerHTML = `
+      <span class="pn">${p.n}</span>
+      <span class="ptitle">${p.t}</span>
+      <span class="pdesc">${p.d}</span>
+      <span class="pbadge" style="border:1px solid ${p.bc}33;color:${p.bc};background:${p.bc}0d">${p.badge}</span>`;
+    writeEl(row);
+  });
+  blank();
+  writeln(`<span class="c-purple bold">└──────────────────────────────────────────────────────┘</span>`);
+}
+
+function renderSkills() {
+  writeln(`<span class="c-green bold glow-green">┌─ skills / stack ─────────────────────────────────────┐</span>`);
+  blank();
+
+  // Progress bars
+  writeln(`  <span class="c-dim">── proficiency ──────────────────────────────────────</span>`);
+  const bars = [
+    { l:'C / C++',        w:88, cls:'high'  },
+    { l:'Python',         w:85, cls:'high'  },
+    { l:'Linux / Bash',   w:82, cls:'high'  },
+    { l:'OpenMPI',        w:76, cls:'med'   },
+    { l:'STL',            w:80, cls:'high'  },
+    { l:'ROS2 (Python)',  w:70, cls:'med'   },
+    { l:'NumPy/SciPy',    w:78, cls:'med'   },
+    { l:'Scikit-learn',   w:74, cls:'med'   },
+  ];
+  bars.forEach(b => {
+    const row = document.createElement('div');
+    row.className = 'pbar-row';
+    row.innerHTML = `
+      <span class="pbar-label">${b.l}</span>
+      <div class="pbar-track"><div class="pbar-fill ${b.cls}" style="width:${b.w}%"></div></div>
+      <span class="pbar-pct">${b.w}%</span>`;
+    writeEl(row);
+  });
+
+  blank();
+  writeln(`  <span class="c-dim">── HPC & Systems ────────────────────────────────────</span>`);
+  const hpcTags = document.createElement('div');
+  hpcTags.className = 'tag-wrap';
+  ['C','C++','STL','OpenMPI','OpenMP','Linux','Bash','Parallel Algorithms','Memory Management'].forEach(t => {
+    const tg = document.createElement('span');
+    tg.className = 'tag cyan'; tg.textContent = t;
+    hpcTags.appendChild(tg);
+  });
+  writeEl(hpcTags);
+
+  blank();
+  writeln(`  <span class="c-dim">── Scientific & Robotics ────────────────────────────</span>`);
+  const sciTags = document.createElement('div');
+  sciTags.className = 'tag-wrap';
+  ['Python','NumPy','SciPy','Matplotlib','Pandas','Scikit-learn','ROS2 (Python)','Telescope Ops','Satellite Spectroscopy'].forEach(t => {
+    const tg = document.createElement('span');
+    tg.className = 'tag green'; tg.textContent = t;
+    sciTags.appendChild(tg);
+  });
+  writeEl(sciTags);
+
+  blank();
+  writeln(`  <span class="c-dim">── Domains & Research ───────────────────────────────</span>`);
+  const domTags = document.createElement('div');
+  domTags.className = 'tag-wrap';
+  ['Astrophysics','Exoplanet Research','Molecular Biology','Natural Science','HPC','Quant Finance','Photoelectronics','ML/Classification'].forEach(t => {
+    const tg = document.createElement('span');
+    tg.className = 'tag amber'; tg.textContent = t;
+    domTags.appendChild(tg);
+  });
+  writeEl(domTags);
+
+  blank();
+  writeln(`<span class="c-green bold">└──────────────────────────────────────────────────────┘</span>`);
+}
+
+function renderContact() {
+  writeln(`<span class="c-cyan bold">┌─ contact ────────────────────────────────────────────┐</span>`);
+  blank();
+  writeln(`  <span class="c-white">Open to research collaborations, M.Tech leads,</span>`);
+  writeln(`  <span class="c-white">HPC internships and opportunities in USA · Switzerland · Netherlands.</span>`);
+  blank();
+  const links = [
+    { lbl:'Work Mail', val:'aralithic@gmail.com',       href:'mailto:aralithic@gmail.com',        col:'var(--cyan)' },
+    { lbl:'Personal',  val:'sayedumairali@outlook.com', href:'mailto:sayedumairali@outlook.com',   col:'var(--cyan)' },
+    { lbl:'GitHub',    val:'github.com/aralithic',      href:'https://github.com/aralithic',       col:'var(--purple)' },
+  ];
+  links.forEach(lk => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:1rem;align-items:center;padding:.25rem 0;border-bottom:1px solid rgba(0,200,255,0.07);';
+    row.innerHTML = `<span style="color:var(--dim);min-width:90px;font-size:.62rem;letter-spacing:.12em">${lk.lbl}</span>
+      <a href="${lk.href}" target="_blank" style="color:${lk.col};text-decoration:none;font-size:.7rem">${lk.val}</a>
+      <span style="color:var(--dim);margin-left:auto;font-size:.65rem">→</span>`;
+    writeEl(row);
+  });
+  blank();
+  writeln(`<span class="c-cyan bold">└──────────────────────────────────────────────────────┘</span>`);
+}
+
+function renderTargets() {
+  writeln(`<span class="c-cyan bold">┌─ opportunity targets ────────────────────────────────┐</span>`);
+  blank();
+  const locs = [
+    { name:'United States',  note:'Research institutions · Quant firms · National Labs' },
+    { name:'Switzerland',    note:'CERN · ETH Zürich · EPFL · PSI' },
+    { name:'Netherlands',    note:'ASTRON · Delft TU · University of Amsterdam' },
+  ];
+  locs.forEach(loc => {
+    const row = document.createElement('div');
+    row.className = 'loc-row';
+    row.innerHTML = `<span class="loc-dot">◈</span><span class="loc-n">${loc.name}</span><span class="loc-note">${loc.note}</span>`;
+    writeEl(row);
+  });
+  blank();
+  writeln(`<span class="c-dim">  Seeking: HPC · Photoelectronics · Quant — highest impact + compensation</span>`);
+  blank();
+  writeln(`<span class="c-cyan bold">└──────────────────────────────────────────────────────┘</span>`);
+}
+
+function renderInterests() {
+  writeln(`<span class="c-purple bold">┌─ research interests ─────────────────────────────────┐</span>`);
+  blank();
+  const items = [
+    { icon:'★', col:'var(--amber)',  t:'Astrophysics',      d:'Exoplanets, stellar classification, spectroscopy, Kepler data' },
+    { icon:'◎', col:'var(--green)',  t:'Molecular Biology', d:'3D structure computation, protein folding, bioinformatics' },
+    { icon:'≋', col:'var(--cyan)',   t:'Natural Science',   d:'Environmental computation — climate, algae, Martian atmosphere' },
+    { icon:'⚡', col:'var(--purple)', t:'HPC',               d:'Parallel algorithms, MPI, OpenMP, memory-bound computation' },
+    { icon:'∿', col:'var(--pink)',   t:'Quant Finance',     d:'Algorithmic systems, statistical modelling, trading infrastructure' },
+    { icon:'◉', col:'var(--amber)',  t:'Photoelectronics',  d:'Semiconductor devices, photonic computing, optoelectronics' },
+  ];
+  items.forEach(it => {
+    writeln(`  <span style="color:${it.col}">${it.icon} ${it.t}</span>  <span class="c-dim">${it.d}</span>`);
+  });
+  blank();
+  writeln(`<span class="c-purple bold">└──────────────────────────────────────────────────────┘</span>`);
+}
+
+// ═══════════════════════════════════════════════════════
+// SHELL LAUNCH
+// ═══════════════════════════════════════════════════════
+
+async function launchShell() {
+  termOut.innerHTML = '';
+  autoScroll = false; // keep user at top during load
+
+  // 1. Neofetch at very top
+  renderNeofetch();
+  blank();
+
+  // 2. Welcome + command reference RIGHT AWAY so user sees it
+  writeln(`<span class="c-dim">─────────────────────────────────────────────────────────────────</span>`);
+  writeln(`<span class="c-cyan bold">  Welcome to AraLithic-OS</span><span class="c-dim"> — portfolio shell v2.1.0</span>`);
+  writeln(`<span class="c-dim">─────────────────────────────────────────────────────────────────</span>`);
+  blank();
+  writeln(`<span class="c-dim">  All sections auto-load below. Scroll down to read, or retype</span>`);
+  writeln(`<span class="c-dim">  any command to re-display it. Input bar is always at bottom.</span>`);
+  blank();
+  // Inline command reference table — visible BEFORE content loads
+  writeln(`<span class="c-amber bold">  ┌─ available commands ───────────────────────────────────────┐</span>`);
+  const cmdRef = [
+    ['neofetch',  'system info + ASCII art banner'],
+    ['about',     'who is AraLithic'],
+    ['research',  'published paper — Kepler exoplanet ML'],
+    ['projects',  'project list'],
+    ['skills',    'full skill stack + proficiency bars'],
+    ['contact',   'email & github'],
+    ['targets',   'opportunity locations (USA / CH / NL)'],
+    ['interests', 'research passions'],
+    ['help',      'show this command list again'],
+    ['clear',     'clear terminal, restart from neofetch'],
+    ['exit',      'return to login screen'],
+  ];
+  cmdRef.forEach(([cmd, desc]) => {
+    writeln(`  <span class="c-amber">│</span>  <span class="c-cyan" style="display:inline-block;min-width:110px">${cmd}</span><span class="c-dim">${desc}</span>`);
+  });
+  writeln(`<span class="c-amber bold">  └────────────────────────────────────────────────────────────┘</span>`);
+  blank();
+  writeln(`<span class="c-dim">  Tip: use <span class="c-white">Tab</span> to autocomplete · <span class="c-white">↑↓</span> for history</span>`);
+  writeln(`<span class="c-dim">─────────────────────────────────────────────────────────────────</span>`);
+  blank();
+  writeln(`<span class="c-green">  ↓  Loading full portfolio below...</span>`);
+  blank();
+
+  // 3. Auto-run all sections with small delays (no scroll)
+  const autoRun = ['about','research','projects','skills','contact','targets','interests'];
+  for (const cmd of autoRun) {
+    await sleep(40);
+    echoCmd(cmd);
+    await sleep(10);
+    runCommand(cmd, false);
+    blank();
+  }
+
+  // 4. Final prompt hint
+  writeln(`<span class="c-dim">─────────────────────────────────────────────────────────────────</span>`);
+  writeln(`<span class="c-green">  ✓ Portfolio loaded.</span> <span class="c-dim">Scroll up to read from the top, or type a command below.</span>`);
+  writeln(`<span class="c-dim">─────────────────────────────────────────────────────────────────</span>`);
+  blank();
+
+  // 5. NOW enable auto-scroll for user commands
+  autoScroll = true;
+  cmdInput.focus();
+}
+
+// ═══════════════════════════════════════════════════════
+// COMMAND HANDLER
+// ═══════════════════════════════════════════════════════
+
+function runCommand(cmd, echo = true) {
+  const c = cmd.trim().toLowerCase();
+  if (!c) return;
+  if (echo) { echoCmd(cmd); blank(); }
+
+  switch (c) {
+    case 'help':      renderHelp(); break;
+    case 'neofetch':  renderNeofetch(); break;
+    case 'about':     renderAbout(); break;
+    case 'research':  renderResearch(); break;
+    case 'projects':  renderProjects(); break;
+    case 'skills':    renderSkills(); break;
+    case 'contact':   renderContact(); break;
+    case 'targets':   renderTargets(); break;
+    case 'interests': renderInterests(); break;
+    case 'clear':
+      termOut.innerHTML = '';
+      renderNeofetch();
+      break;
+    case 'exit':
+      showScreen('login-screen');
+      loginInput.focus();
+      break;
+    case 'sudo':
+    case 'sudo su':
+      writeln(`<span class="c-red">[sudo] permission denied: you are not root (and you don't need to be)</span>`);
+      break;
+    case 'ls':
+      writeln(`<span class="c-cyan">about</span>  <span class="c-cyan">research</span>  <span class="c-cyan">projects</span>  <span class="c-cyan">skills</span>  <span class="c-cyan">contact</span>  <span class="c-cyan">targets</span>  <span class="c-cyan">interests</span>`);
+      break;
+    case 'pwd':
+      writeln(`<span class="c-white">/home/aralithic</span>`);
+      break;
+    case 'whoami':
+      writeln(`<span class="c-white">umair — AraLithic — HPC researcher, CSE Y2, Bhubaneswar</span>`);
+      break;
+    case 'uname -a':
+      writeln(`<span class="c-dim">AraLithic-OS 2.1.0-lts #1 SMP x86_64 GNU/Linux</span>`);
+      break;
+    case 'date':
+      writeln(`<span class="c-white">${new Date().toString()}</span>`);
+      break;
+    case 'uptime':
+      writeln(`<span class="c-white">up since login — idle 0%, jobs 1</span>`);
+      break;
+    case 'history':
+      cmdHistory.forEach((h, i) => writeln(`<span class="c-dim">${String(i+1).padStart(4,' ')}  ${h}</span>`));
+      break;
+    default:
+      writeln(`<span class="c-red">command not found: <span class="c-white">${c}</span></span>`);
+      writeln(`<span class="c-dim">Type <span class="c-cyan">help</span> for available commands.</span>`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// INPUT HANDLING
+// ═══════════════════════════════════════════════════════
+
+cmdInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const val = cmdInput.value;
+    cmdHistory.push(val);
+    histIdx = cmdHistory.length;
+    cmdInput.value = '';
+    blank();
+    runCommand(val);
+    blank();
+    scrollToBottom(); // always scroll after user command
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (histIdx > 0) { histIdx--; cmdInput.value = cmdHistory[histIdx]; }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (histIdx < cmdHistory.length - 1) { histIdx++; cmdInput.value = cmdHistory[histIdx]; }
+    else { histIdx = cmdHistory.length; cmdInput.value = ''; }
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    const partial = cmdInput.value.toLowerCase();
+    const all = ['help','neofetch','about','research','projects','skills','contact','targets','interests','clear','exit','ls','pwd','whoami','uname -a','date','uptime','history'];
+    const match = all.filter(c => c.startsWith(partial));
+    if (match.length === 1) cmdInput.value = match[0];
+    else if (match.length > 1) {
+      blank();
+      writeln(`<span class="c-dim">${match.join('  ')}</span>`);
+    }
+  }
+});
+
+// Keep input focused
+document.getElementById('terminal-screen').addEventListener('click', () => cmdInput.focus());
+document.getElementById('login-screen').addEventListener('click', () => loginInput.focus());
+
+// ═══════════════════════════════════════════════════════
+// CONTACT FORM (inline via contact command addition)
+// ═══════════════════════════════════════════════════════
+
+// Extend contact to include inline message send
+const _origContact = renderContact;
+// (already defined above — contact email is linked via mailto)
+
+</script>
+</body>
+</html>
