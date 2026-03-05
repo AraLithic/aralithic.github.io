@@ -407,6 +407,10 @@
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Single global uptime tracker — cleared on each neofetch render
+let _uptimeInterval = null;
+let _uptimeStart = null;
+
 function h(tag, cls, html) {
   const el = document.createElement(tag);
   if (cls) el.className = cls;
@@ -421,7 +425,7 @@ document.addEventListener('mousemove', e => {
   cur.style.top  = e.clientY + 'px';
 });
 
-// Clock
+// Clock — aligned to the exact second boundary to prevent flicker
 function updateClock() {
   const now = new Date();
   document.getElementById('tb-clock').textContent =
@@ -429,7 +433,15 @@ function updateClock() {
   document.getElementById('tb-date').textContent =
     now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 }
-updateClock(); setInterval(updateClock, 1000);
+function scheduleClock() {
+  updateClock();
+  const msToNextSecond = 1000 - (Date.now() % 1000);
+  setTimeout(() => {
+    updateClock();
+    setInterval(updateClock, 1000);
+  }, msToNextSecond);
+}
+scheduleClock();
 
 // ═══════════════════════════════════════════════════════
 // ASCII ART
@@ -512,39 +524,40 @@ async function typeBootText(text, color = '#3a5a6a', speed = 22) {
 }
 
 const BOOT_LINES = [
-  { html: `<span style="color:#1e3040">────────────────────────────────────────────────────────────────────────────────</span>` },
-  { html: `<span style="color:var(--cyan);font-weight:700;text-shadow:0 0 12px rgba(0,200,255,.6)">  ARALITHIC-OS  v2.1.0-lts  [x86_64]</span>` },
-  { html: `<span style="color:#1e3040">────────────────────────────────────────────────────────────────────────────────</span>` },
-  { html: `` },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Started GRUB bootloader</span>`, d: 25 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Loading kernel modules...</span>`, d: 30 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Mounting filesystems</span>`, d: 25 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Initializing memory allocator</span>`, d: 28 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Starting OpenMPI daemon</span>`, d: 35 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Loading ROS2 environment</span>`, d: 30 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> HPC runtime initialized — 8 cores detected</span>`, d: 28 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Python 3.12 env activated</span>`, d: 25 },
-  { html: `<span style="color:var(--amber)">  [WARN ] </span> <span style="color:#3a5a6a"> Pixxelraft module not found — skipping</span>`, d: 30 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Loading portfolio.service</span>`, d: 28 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Establishing research context</span>`, d: 30 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Starting chronos daemon</span>`, d: 25 },
-  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Network online</span>`, d: 28 },
-  { html: `` },
-  { html: `<span style="color:#2a4455">  ──── subsystem check ────────────────────────────────────────</span>`, d: 20 },
-  { html: `<span style="color:#3a5a6a">       astrophysics    </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
-  { html: `<span style="color:#3a5a6a">       mol-biology     </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
-  { html: `<span style="color:#3a5a6a">       hpc-compute     </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
-  { html: `<span style="color:#3a5a6a">       quant-engine    </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
-  { html: `<span style="color:#3a5a6a">       exoplanet-ml    </span><span style="color:var(--green)">LOADED</span>`, d: 18 },
-  { html: `` },
+  { html: `<span style="color:#1e3040">────────────────────────────────────────────────────────────────────────────────</span>`, d: 80 },
+  { html: `<span style="color:var(--cyan);font-weight:700;text-shadow:0 0 12px rgba(0,200,255,.6)">  ARALITHIC-OS  v2.1.0-lts  [x86_64]</span>`, d: 60 },
+  { html: `<span style="color:#1e3040">────────────────────────────────────────────────────────────────────────────────</span>`, d: 60 },
+  { html: ``, d: 100 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Started GRUB bootloader</span>`, d: 180 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Loading kernel modules...</span>`, d: 260 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Mounting filesystems</span>`, d: 200 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Initializing memory allocator</span>`, d: 220 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Starting OpenMPI daemon</span>`, d: 300 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Loading ROS2 environment</span>`, d: 240 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> HPC runtime initialized — 8 cores detected</span>`, d: 280 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Python 3.12 env activated</span>`, d: 200 },
+  { html: `<span style="color:var(--amber)">  [WARN ] </span> <span style="color:#3a5a6a"> Pixxelraft module not found — skipping</span>`, d: 220 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Loading portfolio.service</span>`, d: 200 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Establishing research context</span>`, d: 240 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Starting chronos daemon</span>`, d: 180 },
+  { html: `<span style="color:var(--green)">  [  OK  ]</span> <span style="color:#3a5a6a"> Network online</span>`, d: 200 },
+  { html: ``, d: 120 },
+  { html: `<span style="color:#2a4455">  ──── subsystem check ────────────────────────────────────────</span>`, d: 160 },
+  { html: `<span style="color:#3a5a6a">       astrophysics    </span><span style="color:var(--green)">LOADED</span>`, d: 140 },
+  { html: `<span style="color:#3a5a6a">       mol-biology     </span><span style="color:var(--green)">LOADED</span>`, d: 140 },
+  { html: `<span style="color:#3a5a6a">       hpc-compute     </span><span style="color:var(--green)">LOADED</span>`, d: 140 },
+  { html: `<span style="color:#3a5a6a">       quant-engine    </span><span style="color:var(--green)">LOADED</span>`, d: 140 },
+  { html: `<span style="color:#3a5a6a">       exoplanet-ml    </span><span style="color:var(--green)">LOADED</span>`, d: 140 },
+  { html: ``, d: 80 },
 ];
 
 async function runBoot() {
   bootOut.innerHTML = '';
-  let cumDelay = 0;
   for (const ln of BOOT_LINES) {
-    cumDelay += (ln.d || 40);
-    await bootLine(ln.html, cumDelay);
+    await sleep(ln.d || 40);
+    const line = document.createElement('div');
+    line.innerHTML = ln.html;
+    bootOut.appendChild(line);
   }
 
   // Animated ASCII logo
@@ -648,12 +661,13 @@ function renderNeofetch() {
   wrap.appendChild(info);
   writeEl(wrap);
 
-  // live uptime
-  const start = Date.now();
-  setInterval(() => {
+  // live uptime — clear any previous interval, start fresh
+  if (_uptimeInterval) clearInterval(_uptimeInterval);
+  _uptimeStart = Date.now();
+  _uptimeInterval = setInterval(() => {
     const el = document.getElementById('nf-uptime');
-    if (!el) return;
-    const s = Math.floor((Date.now() - start) / 1000);
+    if (!el) { clearInterval(_uptimeInterval); _uptimeInterval = null; return; }
+    const s = Math.floor((Date.now() - _uptimeStart) / 1000);
     el.textContent = s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`;
   }, 1000);
 }
@@ -668,6 +682,7 @@ function renderHelp() {
     ['contact',   'email & github'],
     ['targets',   'opportunity locations'],
     ['interests', 'research passions'],
+    ['form',      'send a message (contact form)'],
     ['clear',     'clear terminal'],
     ['exit',      'return to login screen'],
     ['help',      'show this help'],
@@ -901,6 +916,7 @@ async function launchShell() {
     ['contact',   'email & github'],
     ['targets',   'opportunity locations (USA / CH / NL)'],
     ['interests', 'research passions'],
+    ['form',      'send me a message (contact form)'],
     ['help',      'show this command list again'],
     ['clear',     'clear terminal, restart from neofetch'],
     ['exit',      'return to login screen'],
@@ -956,6 +972,9 @@ function runCommand(cmd, echo = true) {
     case 'contact':   renderContact(); break;
     case 'targets':   renderTargets(); break;
     case 'interests': renderInterests(); break;
+    case 'form':
+      startContactForm();
+      break;
     case 'clear':
       termOut.innerHTML = '';
       renderNeofetch();
@@ -1002,10 +1021,22 @@ function runCommand(cmd, echo = true) {
 cmdInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     const val = cmdInput.value;
-    cmdHistory.push(val);
-    histIdx = cmdHistory.length;
     cmdInput.value = '';
     blank();
+
+    // ── FORM MODE ──
+    if (formMode) {
+      if (formStep === 'confirm') {
+        handleFormConfirm(val);
+      } else {
+        handleFormInput(val);
+      }
+      return;
+    }
+
+    // ── NORMAL SHELL ──
+    cmdHistory.push(val);
+    histIdx = cmdHistory.length;
     runCommand(val);
     blank();
     scrollToBottom(); // always scroll after user command
@@ -1019,7 +1050,7 @@ cmdInput.addEventListener('keydown', e => {
   } else if (e.key === 'Tab') {
     e.preventDefault();
     const partial = cmdInput.value.toLowerCase();
-    const all = ['help','neofetch','about','research','projects','skills','contact','targets','interests','clear','exit','ls','pwd','whoami','uname -a','date','uptime','history'];
+    const all = ['help','neofetch','about','research','projects','skills','contact','targets','interests','form','clear','exit','ls','pwd','whoami','uname -a','date','uptime','history'];
     const match = all.filter(c => c.startsWith(partial));
     if (match.length === 1) cmdInput.value = match[0];
     else if (match.length > 1) {
@@ -1034,12 +1065,145 @@ document.getElementById('terminal-screen').addEventListener('click', () => cmdIn
 document.getElementById('login-screen').addEventListener('click', () => loginInput.focus());
 
 // ═══════════════════════════════════════════════════════
-// CONTACT FORM (inline via contact command addition)
+// CONTACT FORM — terminal wizard via "form" command
 // ═══════════════════════════════════════════════════════
 
-// Extend contact to include inline message send
-const _origContact = renderContact;
-// (already defined above — contact email is linked via mailto)
+let formMode = false;        // are we in form-collection mode?
+let formStep = 0;            // current step index
+let formData  = {};          // collected field values
+const FORM_ENDPOINT = 'https://formspree.io/f/mqeyzpnq';
+
+const FORM_STEPS = [
+  { key: 'name',    label: 'your name',          hint: 'e.g. Jane Smith',             validate: v => v.length >= 2 },
+  { key: 'email',   label: 'your email address', hint: 'e.g. jane@example.com',       validate: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
+  { key: 'subject', label: 'subject',             hint: 'e.g. Research Collaboration', validate: v => v.length >= 3 },
+  { key: 'message', label: 'message',             hint: 'your full message here',      validate: v => v.trim().length >= 10 },
+];
+
+function formPrompt(step) {
+  const s = FORM_STEPS[step];
+  writeln(`<span class="c-amber">  [${step + 1}/${FORM_STEPS.length}]</span> <span class="c-white">${s.label}</span> <span class="c-dim">— ${s.hint}</span>`);
+  writeln(`<span class="c-pink">  form</span><span class="c-dim">@</span><span class="c-cyan">aralithic</span><span class="c-dim">:</span><span class="c-purple">~</span><span class="c-dim">$</span>`);
+}
+
+function startContactForm() {
+  blank();
+  writeln(`<span class="c-pink bold">┌─ contact form ───────────────────────────────────────┐</span>`);
+  writeln(`<span class="c-dim">  Send me a direct message. Fill in each field and</span>`);
+  writeln(`<span class="c-dim">  press Enter to proceed. Type <span class="c-red">abort</span> at any point to exit.</span>`);
+  writeln(`<span class="c-pink bold">└──────────────────────────────────────────────────────┘</span>`);
+  blank();
+  formMode = true;
+  formStep = 0;
+  formData  = {};
+  // Change prompt colour hint
+  updateFormPromptStyle(true);
+  formPrompt(0);
+  scrollToBottom();
+}
+
+function updateFormPromptStyle(active) {
+  const ps1 = document.querySelector('#input-bar .prompt-ps1');
+  if (!ps1) return;
+  if (active) {
+    ps1.innerHTML = `<span class="c-pink">form</span><span class="c-dim">@</span><span class="c-cyan">aralithic</span><span class="c-dim">:</span><span class="c-purple">~</span><span class="c-dim">$</span>`;
+  } else {
+    ps1.innerHTML = `<span class="c-green">umair</span><span class="c-dim">@</span><span class="host c-cyan">aralithic</span><span class="c-dim">:</span><span class="path c-purple">~</span><span class="c-dim">$</span>`;
+  }
+}
+
+function handleFormInput(val) {
+  const trimmed = val.trim();
+
+  // Echo user input in pink
+  writeln(`<span class="c-pink">form</span><span class="c-dim">@</span><span class="c-cyan">aralithic</span><span class="c-dim">:</span><span class="c-purple">~</span><span class="c-dim">$</span> <span class="c-white">${trimmed}</span>`);
+
+  if (trimmed.toLowerCase() === 'abort') {
+    blank();
+    writeln(`<span class="c-red">  ✕ form aborted.</span>`);
+    blank();
+    formMode = false;
+    updateFormPromptStyle(false);
+    scrollToBottom();
+    return;
+  }
+
+  const step = FORM_STEPS[formStep];
+  if (!step.validate(trimmed)) {
+    writeln(`<span class="c-red">  ✕ invalid ${step.label} — please try again.</span>`);
+    formPrompt(formStep);
+    scrollToBottom();
+    return;
+  }
+
+  formData[step.key] = trimmed;
+  blank();
+
+  formStep++;
+  if (formStep < FORM_STEPS.length) {
+    formPrompt(formStep);
+    scrollToBottom();
+  } else {
+    // All fields collected — show preview
+    writeln(`<span class="c-amber bold">┌─ confirm & send ─────────────────────────────────────┐</span>`);
+    writeln(`  <span class="c-dim">name   :</span> <span class="c-white">${formData.name}</span>`);
+    writeln(`  <span class="c-dim">email  :</span> <span class="c-white">${formData.email}</span>`);
+    writeln(`  <span class="c-dim">subject:</span> <span class="c-white">${formData.subject}</span>`);
+    writeln(`  <span class="c-dim">message:</span> <span class="c-white">${formData.message}</span>`);
+    writeln(`<span class="c-amber bold">└──────────────────────────────────────────────────────┘</span>`);
+    blank();
+    writeln(`<span class="c-dim">  Type <span class="c-green">yes</span> to send · <span class="c-red">no</span> to discard · <span class="c-red">abort</span> to exit</span>`);
+    writeln(`<span class="c-pink">form</span><span class="c-dim">@</span><span class="c-cyan">aralithic</span><span class="c-dim">:</span><span class="c-purple">~</span><span class="c-dim">$</span>`);
+    formStep = 'confirm';
+    scrollToBottom();
+  }
+}
+
+async function handleFormConfirm(val) {
+  const v = val.trim().toLowerCase();
+  writeln(`<span class="c-pink">form</span><span class="c-dim">@</span><span class="c-cyan">aralithic</span><span class="c-dim">:</span><span class="c-purple">~</span><span class="c-dim">$</span> <span class="c-white">${val.trim()}</span>`);
+  blank();
+
+  if (v === 'yes') {
+    writeln(`<span class="c-dim">  ▸ Transmitting message...</span>`);
+    scrollToBottom();
+    try {
+      const res = await fetch(FORM_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          name:    formData.name,
+          email:   formData.email,
+          subject: formData.subject,
+          message: formData.message,
+        }),
+      });
+      if (res.ok) {
+        writeln(`<span class="c-green bold">  ✓ message sent successfully.</span>`);
+        writeln(`<span class="c-dim">    I'll get back to you at <span class="c-white">${formData.email}</span></span>`);
+      } else {
+        writeln(`<span class="c-red">  ✕ transmission failed (HTTP ${res.status}). Try emailing directly.</span>`);
+      }
+    } catch {
+      writeln(`<span class="c-red">  ✕ network error. Check connection or email me directly.</span>`);
+    }
+  } else if (v === 'no') {
+    writeln(`<span class="c-amber">  ✕ message discarded.</span>`);
+  } else if (v === 'abort') {
+    writeln(`<span class="c-red">  ✕ form aborted.</span>`);
+  } else {
+    writeln(`<span class="c-red">  ✕ type <span class="c-green">yes</span>, <span class="c-red">no</span>, or <span class="c-red">abort</span>.</span>`);
+    writeln(`<span class="c-pink">form</span><span class="c-dim">@</span><span class="c-cyan">aralithic</span><span class="c-dim">:</span><span class="c-purple">~</span><span class="c-dim">$</span>`);
+    scrollToBottom();
+    return; // stay in confirm mode
+  }
+
+  blank();
+  formMode = false;
+  formStep = 0;
+  updateFormPromptStyle(false);
+  scrollToBottom();
+}
 
 </script>
 </body>
